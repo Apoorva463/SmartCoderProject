@@ -1,0 +1,10 @@
+fastapi
+uvicorn
+requests
+beautifulsoup4
+tiktoken
+pymilvus
+sentence-transformers
+numpy
+python-multipart
+pydantic
