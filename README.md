@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 # Website Content Search Application
 
 A single-page application that allows users to input a website URL and search query to find the top 10 most relevant content chunks from the website.
@@ -157,3 +158,7 @@ Check the console output for detailed error messages and processing logs.
 ## License
 
 MIT License
+=======
+# SmartCoderProject
+Single-page application (SPA) where users can input a website URL and a search  query. The application will return the top 10 matches of HTML DOM content (chunks) based  on the search query. 
+>>>>>>> 25d1e39576f85af61dee663718b1caa46e871a75
