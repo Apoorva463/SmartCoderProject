@@ -106,16 +106,24 @@ class VectorSearch:
     async def search_similar_chunks(self, query: str, chunks: List[Dict]) -> List[Dict]:
         """Search for similar chunks using vector similarity"""
         try:
+            logger.info(f"Starting search with {len(chunks)} chunks for query: '{query}'")
+            
             # Generate query embedding
             query_embedding = self.generate_embedding(query)
             
             if self.milvus_available:
-                return await self._vector_search(query, query_embedding, chunks)
+                logger.info("Using Milvus vector search")
+                results = await self._vector_search(query, query_embedding, chunks)
             else:
-                return await self._fallback_search(query, chunks)
+                logger.info("Using fallback text search")
+                results = await self._fallback_search(query, chunks)
+            
+            logger.info(f"Search completed, returning {len(results)} results")
+            return results
                 
         except Exception as e:
             logger.error(f"Error in vector search: {e}")
+            logger.info("Falling back to text search due to error")
             return await self._fallback_search(query, chunks)
     
     async def _vector_search(self, query: str, query_embedding: List[float], chunks: List[Dict]) -> List[Dict]:
@@ -130,12 +138,12 @@ class VectorSearch:
             # Search parameters
             search_params = {"metric_type": "L2", "params": {"nprobe": 10}}
             
-            # Perform search
+            # Perform search - request more results to ensure we get 10 good ones
             results = self.collection.search(
                 data=[query_embedding],
                 anns_field="embedding",
                 param=search_params,
-                limit=10,
+                limit=min(len(chunks), 20),  # Request up to 20 results or all chunks if fewer
                 output_fields=["content", "url", "chunk_index"]
             )
             
@@ -151,7 +159,8 @@ class VectorSearch:
                 }
                 formatted_results.append(result)
             
-            return formatted_results[:10]
+            logger.info(f"Vector search found {len(formatted_results)} results")
+            return formatted_results[:10]  # Return top 10
             
         except Exception as e:
             logger.error(f"Error in vector search: {e}")
@@ -180,19 +189,56 @@ class VectorSearch:
                 keyword_count = sum(1 for word in query_words if word in content_lower)
                 frequency_score = keyword_count / len(query_words) if query_words else 0
                 
-                # Combined score
-                combined_score = (jaccard_score * 0.6) + (frequency_score * 0.4)
+                # Substring matching score (for partial matches)
+                substring_score = 0
+                for word in query_words:
+                    if word in content_lower:
+                        substring_score += 1
+                substring_score = substring_score / len(query_words) if query_words else 0
                 
-                scored_chunks.append({
-                    "content": chunk["content"],
-                    "url": chunk["url"],
-                    "chunk_index": chunk["chunk_index"],
-                    "score": combined_score,
-                    "title": chunk.get("title", self._extract_title(chunk["content"]))
-                })
+                # Combined score with more lenient scoring
+                combined_score = (jaccard_score * 0.4) + (frequency_score * 0.4) + (substring_score * 0.2)
+                
+                # Include chunks with any relevance (score > 0) to ensure we get more results
+                # Also include chunks with partial word matches for broader results
+                partial_matches = 0
+                for word in query_words:
+                    if len(word) > 3:  # Only check longer words for partial matches
+                        for content_word in content_words:
+                            if word in content_word or content_word in word:
+                                partial_matches += 1
+                                break
+                
+                partial_score = partial_matches / len(query_words) if query_words else 0
+                final_score = max(combined_score, partial_score * 0.3)
+                
+                # Include any chunk with some relevance or if no good matches, include all chunks with minimal score
+                if final_score > 0 or any(word in content_lower for word in query_words) or len(scored_chunks) < 10:
+                    scored_chunks.append({
+                        "content": chunk["content"],
+                        "url": chunk["url"],
+                        "chunk_index": chunk["chunk_index"],
+                        "score": max(final_score, 0.001),  # Ensure minimum score
+                        "title": chunk.get("title", self._extract_title(chunk["content"]))
+                    })
+            
+            # If we don't have enough results, add remaining chunks with minimal scores
+            if len(scored_chunks) < min(10, len(chunks)):
+                existing_indices = {chunk["chunk_index"] for chunk in scored_chunks}
+                for chunk in chunks:
+                    if chunk["chunk_index"] not in existing_indices and len(scored_chunks) < 10:
+                        scored_chunks.append({
+                            "content": chunk["content"],
+                            "url": chunk["url"],
+                            "chunk_index": chunk["chunk_index"],
+                            "score": 0.001,  # Minimal score for unmatched content
+                            "title": chunk.get("title", self._extract_title(chunk["content"]))
+                        })
             
             # Sort by score and return top 10
             scored_chunks.sort(key=lambda x: x["score"], reverse=True)
+            result_count = min(len(scored_chunks), 10)
+            logger.info(f"Fallback search found {len(scored_chunks)} scored chunks, returning top {result_count}")
             return scored_chunks[:10]
             
         except Exception as e:

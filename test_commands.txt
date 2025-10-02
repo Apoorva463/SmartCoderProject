@@ -1,0 +1,53 @@
+# Backend API Test Commands
+
+## 1. Health Check
+curl -X GET http://localhost:8000/health
+
+## 2. Basic Search Test (Moby-Dick content)
+curl -X POST http://localhost:8000/api/search \
+  -H "Content-Type: application/json" \
+  -d '{
+    "url": "https://httpbin.org/html",
+    "query": "blacksmith melville"
+  }'
+
+## 3. Generic Search Test
+curl -X POST http://localhost:8000/api/search \
+  -H "Content-Type: application/json" \
+  -d '{
+    "url": "https://httpbin.org/html", 
+    "query": "content text"
+  }'
+
+## 4. Test with Different Website
+curl -X POST http://localhost:8000/api/search \
+  -H "Content-Type: application/json" \
+  -d '{
+    "url": "https://example.com",
+    "query": "example domain"
+  }'
+
+## 5. Pretty Print JSON Response (if you have jq installed)
+curl -X POST http://localhost:8000/api/search \
+  -H "Content-Type: application/json" \
+  -d '{
+    "url": "https://httpbin.org/html",
+    "query": "blacksmith melville"
+  }' | jq '.'
+
+## Expected Response Format:
+# {
+#   "results": [
+#     {
+#       "content": "Herman Melville - Moby-Dick...",
+#       "url": "https://httpbin.org/html",
+#       "chunk_index": 0,
+#       "score": 0.6029,
+#       "title": "Herman Melville - Moby-Dick..."
+#     },
+#     // ... more results up to 10
+#   ],
+#   "total_chunks": 3,
+#   "query": "blacksmith melville",
+#   "url": "https://httpbin.org/html"
+# }

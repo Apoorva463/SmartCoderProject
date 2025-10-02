@@ -2,6 +2,11 @@ import React from 'react';
 import './SearchResults.css';
 
 const SearchResults = ({ results, loading }) => {
+  console.log('🎨 SearchResults component rendered');
+  console.log('🎨 Loading state:', loading);
+  console.log('🎨 Results received:', results ? results.length : 0, 'results');
+  console.log('🎨 Results data:', results);
+  
   if (loading) {
     return (
       <div className="loading-container">
@@ -17,7 +22,7 @@ const SearchResults = ({ results, loading }) => {
 
   return (
     <div className="search-results">
-      <h2>Top {results.length} Matches</h2>
+      <h2>Top {results.length} Result{results.length !== 1 ? 's' : ''} (showing up to 10)</h2>
       <div className="results-grid">
         {results.map((result, index) => (
           <div key={index} className="result-card">

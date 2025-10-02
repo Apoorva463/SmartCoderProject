@@ -9,13 +9,13 @@ class ContentProcessor:
     def __init__(self):
         # Initialize tokenizer for GPT-4
         self.tokenizer = tiktoken.get_encoding("cl100k_base")
-        self.max_tokens = 500
+        self.max_tokens = 300  # Smaller chunks to get more results
     
     def count_tokens(self, text: str) -> int:
         """Count tokens in text"""
         return len(self.tokenizer.encode(text))
     
-    def split_text_into_chunks(self, text: str, max_tokens: int = 500) -> List[str]:
+    def split_text_into_chunks(self, text: str, max_tokens: int = 300) -> List[str]:
         """Split text into chunks with maximum token limit"""
         # Split by sentences first
         sentences = re.split(r'[.!?]+', text)
@@ -91,6 +91,13 @@ class ContentProcessor:
                 chunks.append(chunk)
             
             logger.info(f"Created {len(chunks)} chunks from {url}")
+            
+            # Log chunk details for debugging
+            if chunks:
+                avg_tokens = sum(chunk['token_count'] for chunk in chunks) / len(chunks)
+                logger.info(f"Average tokens per chunk: {avg_tokens:.1f}")
+                logger.info(f"First chunk preview: {chunks[0]['content'][:100]}...")
+            
             return chunks
             
         except Exception as e:
